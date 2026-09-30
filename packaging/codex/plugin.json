@@ -1,0 +1,28 @@
+{
+  "name": "hevy-mcp",
+  "version": "0.1.0",
+  "description": "Connect your own Hevy MCP server to Codex.",
+  "author": {
+    "name": "Igal Tabachnik",
+    "url": "https://github.com/hmemcpy"
+  },
+  "interface": {
+    "displayName": "Hevy (self-hosted)",
+    "shortDescription": "Use your own Hevy MCP server.",
+    "longDescription": "Read workouts and routines, manage a workout draft, and review changes before saving. Requires your own single-account Hevy MCP deployment.",
+    "developerName": "Igal Tabachnik",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/hmemcpy/hevy-mcp",
+    "defaultPrompt": [
+      "List my routines without changing anything.",
+      "Show the current workout draft.",
+      "Preview changes before saving them."
+    ]
+  },
+  "mcpServers": "./.mcp.json",
+  "homepage": "https://github.com/hmemcpy/hevy-mcp",
+  "repository": "https://github.com/hmemcpy/hevy-mcp",
+  "license": "Apache-2.0",
+  "keywords": ["hevy", "workouts", "mcp", "self-hosted"]
+}

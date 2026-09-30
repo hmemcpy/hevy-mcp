@@ -56,6 +56,10 @@ For a hosted instance, follow [the Cloudflare setup](docs/deployment.md), then
 OAuth. The owner authorizes the connection with a separate automation token;
 ChatGPT does not receive the Hevy session tokens.
 
+For Codex, [generate a plugin](docs/clients.md#codex-plugin) with your own Worker
+URL. The generator creates a ready-to-add local marketplace; it does not install
+anything or include credentials.
+
 The original APK-derived exercise catalog is intentionally not included. Standard
 exercise search returns `catalog_not_configured` until you supply a catalog you
 have permission to use. [Catalog setup](docs/catalog.md) explains the format and
@@ -78,6 +82,7 @@ Effect handles the request orchestration and schema validation.
 
 GitHub Actions runs checks on pushes and pull requests. Deployment is a separate,
 manual workflow. Pushing to this repository does not deploy a Worker.
+See [CONTRIBUTING](CONTRIBUTING.md) for package checks and clean source archives.
 
 ## Limits worth knowing
 

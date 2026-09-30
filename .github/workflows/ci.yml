@@ -18,3 +18,13 @@ jobs:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
       - run: bun run check
+      - run: bun run package:source
+      - name: Upload source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hevy-mcp-source-${{ github.sha }}
+          path: |
+            dist/hevy-mcp-*.zip
+            dist/hevy-mcp-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

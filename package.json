@@ -10,11 +10,14 @@
     "deploy:dry-run": "bun run catalog:prepare && bunx wrangler deploy --dry-run",
     "lint": "bunx biome check .",
     "lint:fix": "bunx biome check --write .",
-    "test": "bun run catalog:prepare && node --test test/catalog-preparation.node.mjs && bunx vitest run",
+    "test": "bun run catalog:prepare && node --test test/*.node.mjs && bunx vitest run",
     "typecheck": "bun run catalog:prepare && bunx tsc --noEmit",
     "catalog:prepare": "node scripts/prepare-catalog.mjs",
     "postinstall": "node scripts/prepare-catalog.mjs",
-    "check": "bun run test && bun run typecheck && bun run lint && bun run deploy:dry-run"
+    "check": "bun run test && bun run typecheck && bun run lint && bun run check:package && bun run deploy:dry-run",
+    "check:package": "node scripts/check-package.mjs",
+    "package:plugin": "node scripts/package-plugin.mjs",
+    "package:source": "node scripts/package-source.mjs"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.10.3",
