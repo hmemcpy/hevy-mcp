@@ -1,0 +1,7 @@
+hevy-mcp
+Copyright 2026 Igal Tabachnik
+
+This repository contains a standalone extraction of the original Hevy integration.
+Hevy is a third-party service. Its application, branding, and exercise datasets
+are not included in the Apache-2.0 license granted for this project.
+Third-party dependencies retain their own licenses.

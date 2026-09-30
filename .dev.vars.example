@@ -1,0 +1,4 @@
+# Local development only. Never commit the completed .dev.vars file.
+AUTOMATION_API_TOKEN="replace-with-a-long-random-token"
+UPSTREAM_API_KEY="replace-with-your-authorized-mobile-application-key"
+BOOTSTRAP_SESSION_JSON='{"accessToken":"replace-me","authToken":"replace-me","refreshToken":"replace-me","expiresAt":"2099-01-01T00:00:00.000Z"}'

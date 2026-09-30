@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hevy-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "vars": {
+    "UPSTREAM_BASE_URL": "https://api.hevyapp.com",
+    "UPSTREAM_APP_VERSION": "3.1.10",
+    "UPSTREAM_APP_BUILD": "3252321",
+    "UPSTREAM_PLATFORM": "android 33",
+    "UPSTREAM_USER_AGENT": "okhttp/4.12.0"
+  },
+  "secrets": {
+    "required": ["AUTOMATION_API_TOKEN", "UPSTREAM_API_KEY", "BOOTSTRAP_SESSION_JSON"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION_COORDINATOR",
+        "class_name": "SessionCoordinator"
+      }
+    ]
+  },
+  "exports": {
+    "SessionCoordinator": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
