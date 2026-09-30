@@ -1,7 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
   "files": {
-    "includes": ["**", "!node_modules", "!.wrangler"]
+    "includes": [
+      "**",
+      "!node_modules",
+      "!.wrangler",
+      "!**/*.local.json",
+      "!src/exercise-catalog.generated.json"
+    ]
   },
   "assist": {
     "enabled": true,

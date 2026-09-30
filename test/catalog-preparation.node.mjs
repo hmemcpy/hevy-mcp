@@ -72,3 +72,9 @@ for (const [name, input] of [
       assert.throws(prepare)
     }))
 }
+
+test("lint excludes private input and generated catalog data", () => {
+  const config = JSON.parse(readFileSync(new URL("../biome.json", import.meta.url), "utf8"))
+  assert.ok(config.files.includes.includes("!**/*.local.json"))
+  assert.ok(config.files.includes.includes("!src/exercise-catalog.generated.json"))
+})
