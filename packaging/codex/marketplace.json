@@ -1,0 +1,20 @@
+{
+  "name": "hevy-self-hosted",
+  "interface": {
+    "displayName": "Hevy Self Hosted"
+  },
+  "plugins": [
+    {
+      "name": "hevy-mcp",
+      "source": {
+        "source": "local",
+        "path": "./plugins/hevy-mcp"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

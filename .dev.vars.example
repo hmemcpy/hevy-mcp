@@ -1,0 +1,9 @@
+# Local development only. Never commit the completed .dev.vars file.
+AUTOMATION_API_TOKEN="replace-with-a-long-random-token"
+# Required. Official public developer API key from Hevy (requires Hevy Pro):
+# account settings -> API. See docs/deployment.md.
+HEVY_API_KEY="replace-with-your-hevy-api-key"
+# Optional. Secret path token for the Hevy new-workout webhook receiver. When
+# set, configure https://<your-worker>/webhook/hevy/<token> in the Hevy app.
+# Leave empty to disable the receiver.
+HEVY_WEBHOOK_TOKEN=""
