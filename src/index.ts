@@ -2,7 +2,16 @@ import { OAuthProvider } from "@cloudflare/workers-oauth-provider"
 import { createMcpHandler } from "agents/mcp/server"
 import { Clock, Effect, Schema } from "effect"
 import { Api, makeCoordinatorLayer } from "./api"
-import { searchExercises } from "./catalog"
+import {
+  BodyMeasurementSavePreview,
+  createBodyMeasurementSavePreview,
+  RequestedBodyMeasurementSave,
+  toCreateBodyMeasurementBody,
+  toUpdateBodyMeasurementBody,
+  validateBodyMeasurementSavePreview,
+  verifyBodyMeasurementAfterWrite,
+} from "./body-measurement"
+import { searchExercisesWithTemplates } from "./catalog"
 import { ApiError, type HevyApiError, type SessionStorageError } from "./errors"
 import { createWorkoutMcpServer } from "./mcp"
 import { makeAuthorizationHandler } from "./oauth"
@@ -15,6 +24,7 @@ import {
 } from "./progression"
 import { publicCompletedSet, publicWorkout } from "./public"
 import { secureEqual } from "./security"
+import { buildTrainingSummary } from "./training-summary"
 import {
   type ApiRoutine,
   type BodyMeasurement,
@@ -30,6 +40,7 @@ import {
   WorkoutExerciseInsertPreviewRequestSchema,
   WorkoutSyncRequestSchema,
 } from "./types"
+import { SERVER_NAME, SERVER_VERSION } from "./version"
 import { HevyWorkoutWebhook, WebhookEventStore } from "./webhook"
 import {
   applyWorkoutEditPreview,
@@ -266,6 +277,44 @@ const currentIsoTime = Effect.fn("Clock.currentIsoTime")(function* () {
   return new Date(yield* Clock.currentTimeMillis).toISOString()
 })
 
+const previewBodyMeasurementSave = Effect.fn("BodyMeasurement.previewSave")(function* (
+  request: Request,
+) {
+  const body = yield* decodeBody(
+    RequestedBodyMeasurementSave,
+    yield* readJson(request),
+    "Body-measurement preview body is invalid",
+  )
+  const api = yield* Api
+  const existing = yield* api.bodyMeasurement(body.date)
+  return json(yield* createBodyMeasurementSavePreview(body, existing))
+})
+
+const applyBodyMeasurementSave = Effect.fn("BodyMeasurement.applySave")(function* (
+  request: Request,
+) {
+  const preview = yield* decodeBody(
+    BodyMeasurementSavePreview,
+    yield* readJson(request),
+    "Apply body must be an unchanged body-measurement preview",
+  )
+  const api = yield* Api
+  const current = yield* api.bodyMeasurement(preview.date)
+  yield* validateBodyMeasurementSavePreview(preview, current)
+  if (preview.operation === "create") {
+    yield* api.createBodyMeasurement(toCreateBodyMeasurementBody(preview))
+  } else {
+    yield* api.updateBodyMeasurement(preview.date, toUpdateBodyMeasurementBody(preview))
+  }
+  const saved = yield* verifyBodyMeasurementAfterWrite(preview, api.bodyMeasurement(preview.date))
+  return json({
+    saved: true,
+    date: preview.date,
+    operation: preview.operation,
+    measurement: saved === null ? null : publicBodyMeasurement(saved),
+  })
+})
+
 const requireActiveWorkout = Effect.fn("Workout.requireActive")(function* () {
   const store = yield* ActiveWorkoutStore
   const active = yield* store.load()
@@ -478,7 +527,7 @@ const route = Effect.fn("Http.route")(function* (request: Request) {
     return json({ exercises: exercises.map(publicCustomExercise) })
   }
   if (request.method === "GET" && url.pathname === "/v1/exercises") {
-    return json(yield* searchExercises(url.searchParams))
+    return json(yield* searchExercisesWithTemplates(url.searchParams, api.exerciseTemplates()))
   }
   if (request.method === "GET" && url.pathname === "/v1/workouts") {
     const workouts = yield* api.workouts()
@@ -501,6 +550,26 @@ const route = Effect.fn("Http.route")(function* (request: Request) {
   if (request.method === "GET" && url.pathname === "/v1/body-measurements") {
     const measurements = yield* api.bodyMeasurements()
     return json({ measurements: measurements.map(publicBodyMeasurement) })
+  }
+  if (request.method === "POST" && url.pathname === "/v1/body-measurements/save/preview") {
+    return yield* previewBodyMeasurementSave(request)
+  }
+  if (request.method === "POST" && url.pathname === "/v1/body-measurements/save/apply") {
+    return yield* applyBodyMeasurementSave(request)
+  }
+  if (request.method === "GET" && url.pathname === "/v1/training-summary") {
+    const rawWeeks = url.searchParams.get("weeks") ?? "4"
+    const weeks = Number(rawWeeks)
+    if (!Number.isInteger(weeks) || weeks < 1 || weeks > 12) {
+      return yield* new ApiError({
+        status: 400,
+        code: "invalid_query",
+        message: "weeks must be an integer between 1 and 12",
+      })
+    }
+    const workouts = yield* api.workouts()
+    const measurements = yield* api.bodyMeasurements()
+    return json(buildTrainingSummary(workouts, measurements, weeks, yield* currentIsoTime()))
   }
   if (request.method === "GET" && url.pathname === "/v1/account") {
     return json(publicUserAccount(yield* api.userAccount()))
@@ -625,7 +694,7 @@ const restHandler = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ status: "ok" })
+      return json({ status: "ok", name: SERVER_NAME, version: SERVER_VERSION })
     }
     const webhookToken = url.pathname.match(/^\/webhook\/hevy\/([^/]+)$/)?.[1]
     if (webhookToken !== undefined) {

@@ -6,6 +6,7 @@ import {
   type CompletedWorkout,
   type CustomExercise,
   type Env,
+  type ExerciseTemplate,
   HevyApiErrorBodySchema,
   type RoutineSyncResponse,
   type UserAccount,
@@ -27,6 +28,10 @@ export interface Api {
     ReadonlyArray<CustomExercise>,
     ApiError | HevyApiError
   >
+  readonly exerciseTemplates: () => Effect.Effect<
+    ReadonlyArray<ExerciseTemplate>,
+    ApiError | HevyApiError
+  >
   readonly workouts: () => Effect.Effect<ReadonlyArray<CompletedWorkout>, ApiError | HevyApiError>
   readonly workoutCount: () => Effect.Effect<WorkoutCountResponse, ApiError | HevyApiError>
   readonly workoutSync: (
@@ -36,6 +41,14 @@ export interface Api {
     ReadonlyArray<BodyMeasurement>,
     ApiError | HevyApiError
   >
+  readonly bodyMeasurement: (
+    date: string,
+  ) => Effect.Effect<BodyMeasurement | null, ApiError | HevyApiError>
+  readonly createBodyMeasurement: (body: object) => Effect.Effect<void, ApiError | HevyApiError>
+  readonly updateBodyMeasurement: (
+    date: string,
+    body: object,
+  ) => Effect.Effect<void, ApiError | HevyApiError>
   readonly userAccount: () => Effect.Effect<UserAccount, ApiError | HevyApiError>
   readonly routineFolders: () => Effect.Effect<ReadonlyArray<unknown>, ApiError | HevyApiError>
   readonly updateRoutine: (

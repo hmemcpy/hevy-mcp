@@ -16,7 +16,7 @@ Keep the app private to yourself. Do not publish it for a team, lend out the aut
 
 Available reads include workouts, routines, exercise history, custom exercises, account details, and body measurements. `get_account` can return your full name, city, birthday, sex, and height. Body measurements and workout history can be sensitive. Connecting the app allows tool results to be sent to ChatGPT; consider this before enabling it in a conversation.
 
-Write tools can modify routines, create or correct completed workouts, insert exercises, and delete completed workouts. These consequential operations use preview/apply flows, but the server does not independently establish that a human reviewed a preview. Treat the connected client as trusted and review the proposed changes before authorizing them.
+Write tools can modify routines, create or correct completed workouts, insert exercises, save body measurements for a date, and delete completed workouts. These consequential operations use preview/apply flows, but the server does not independently establish that a human reviewed a preview. Treat the connected client as trusted and review the proposed changes before authorizing them.
 
 **Hosted workout defaults are not private:** new drafts default to `isPrivate: false` and `isBiometricsPublic: true`. When privacy is intended, explicitly set `isPrivate: true` and `isBiometricsPublic: false`, and inspect those flags in the final preview before saving. Also inspect `shareToStrava`. The hosted draft is not a live Hevy phone workout; saving it creates a completed workout in Hevy.
 
@@ -41,7 +41,7 @@ For a write, ask for a preview first and inspect the exact target, exercise, set
 
 Only one hosted draft can be active at a time. Use `get_active_workout_session` before starting another. Draft changes stay in the Worker until the finish/apply step saves a completed workout. Discarding the draft and deleting a completed workout are different actions.
 
-If standard exercise search reports `catalog_not_configured`, the deployment lacks the optional local catalog. `list_custom_exercises` returns your custom templates only. It does not recover the missing standard catalog.
+If standard exercise search reports `catalog_not_configured`, Hevy returned no templates and no owner catalog is bundled for this deployment. `list_custom_exercises` lists your custom templates directly. The server's `start_workout_from_routine` prompt carries the full session and finish-approval flow; [WORKOUT_UX.md](../WORKOUT_UX.md) documents the contract and its portable tier you can paste into client instructions. `get_server_info` reports the deployed version if you need to confirm which release you are talking to.
 
 ## OAuth access and revocation
 

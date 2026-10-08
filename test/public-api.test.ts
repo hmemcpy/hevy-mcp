@@ -406,3 +406,87 @@ describe("public API writes", () => {
     expect(error.status).toBe(501)
   })
 })
+
+describe("public API exercise templates and measurements", () => {
+  it("pages the full exercise-template catalog at the documented page size", async () => {
+    const { calls, fetcher } = recordingFetcher(url => {
+      if (url.includes("page=1")) {
+        return Response.json({
+          page: 1,
+          page_count: 2,
+          exercise_templates: [
+            {
+              id: "std-1",
+              title: "Bench Press (Barbell)",
+              type: "weight_reps",
+              primary_muscle_group: "chest",
+              secondary_muscle_groups: ["triceps"],
+              is_custom: false,
+            },
+          ],
+        })
+      }
+      if (url.includes("page=2")) {
+        return Response.json({
+          page: 2,
+          page_count: 2,
+          exercise_templates: [
+            { id: "custom-1", title: "My Move", type: "reps_only", is_custom: true },
+          ],
+        })
+      }
+      return undefined
+    })
+    const templates = await Effect.runPromise(
+      Effect.flatMap(makePublicApi(config, fetcher), api => api.exerciseTemplates()),
+    )
+    expect(calls.map(call => call.url)).toEqual([
+      "https://api.example.test/v1/exercise_templates?page=1&pageSize=100",
+      "https://api.example.test/v1/exercise_templates?page=2&pageSize=100",
+    ])
+    expect(templates).toHaveLength(2)
+    expect(templates[0]).toMatchObject({
+      id: "std-1",
+      title: "Bench Press (Barbell)",
+      exercise_type: "weight_reps",
+      muscle_group: "chest",
+      other_muscles: ["triceps"],
+      is_custom: false,
+    })
+    expect(templates[1]).toMatchObject({ id: "custom-1", is_custom: true })
+  })
+
+  it("returns null for a missing single measurement date and maps a present one", async () => {
+    const { calls, fetcher } = recordingFetcher(url => {
+      if (url.endsWith("/v1/body_measurements/2026-10-08")) {
+        return Response.json({ date: "2026-10-08", weight_kg: 80.5 })
+      }
+      return new Response(JSON.stringify({ error: "not found" }), { status: 404 })
+    })
+    const api = await Effect.runPromise(makePublicApi(config, fetcher))
+    const found = await Effect.runPromise(api.bodyMeasurement("2026-10-08"))
+    expect(found).toMatchObject({ date: "2026-10-08", weight_kg: 80.5 })
+    const missing = await Effect.runPromise(api.bodyMeasurement("2026-10-09"))
+    expect(missing).toBeNull()
+    expect(calls).toHaveLength(2)
+  })
+
+  it("creates and updates measurements with flat wire bodies", async () => {
+    const { calls, fetcher } = recordingFetcher(() => new Response("", { status: 200 }))
+    const api = await Effect.runPromise(makePublicApi(config, fetcher))
+    await Effect.runPromise(
+      api.createBodyMeasurement({ date: "2026-10-08", weight_kg: 80, waist: 79 }),
+    )
+    await Effect.runPromise(api.updateBodyMeasurement("2026-10-08", { weight_kg: 81 }))
+    expect(calls[0]?.url).toBe("https://api.example.test/v1/body_measurements")
+    expect(calls[0]?.method).toBe("POST")
+    expect(JSON.parse(calls[0]?.body ?? "{}")).toEqual({
+      date: "2026-10-08",
+      weight_kg: 80,
+      waist: 79,
+    })
+    expect(calls[1]?.url).toBe("https://api.example.test/v1/body_measurements/2026-10-08")
+    expect(calls[1]?.method).toBe("PUT")
+    expect(JSON.parse(calls[1]?.body ?? "{}")).toEqual({ weight_kg: 81 })
+  })
+})

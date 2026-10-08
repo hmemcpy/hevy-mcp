@@ -27,7 +27,7 @@ bun run deploy:dry-run
 
 Tests use synthetic data; passing them does not verify your credentials or live compatibility. A dry run checks bundling, not production authentication. If a pinned package cannot be resolved by your registry, stop and resolve that dependency problem instead of silently downgrading or regenerating the lockfile.
 
-The optional standard-exercise catalog is deliberately not distributed. If you have a catalog you are authorized to use, place it in `exercise-catalog.local.json` and follow the format and import instructions in the [catalog guide](catalog.md). `bun run catalog:prepare` validates it and writes the ignored `src/exercise-catalog.generated.json`. The normal test, typecheck, development, and deployment scripts prepare this build input automatically. Without a catalog, standard-exercise search returns `503 catalog_not_configured`; other API functions remain available. Custom exercises are a documented public API feature, not a complete standard-catalog replacement.
+The optional standard-exercise catalog is deliberately not distributed. Standard exercise search now reads your account's exercise templates from Hevy's public API (cached for five minutes), so it works without any bundled file. If you have a catalog you are authorized to use, place it in `exercise-catalog.local.json` and follow the format and import instructions in the [catalog guide](catalog.md); its entries are merged with Hevy's templates and take precedence on ID collisions, adding metadata Hevy's listing does not return. `bun run catalog:prepare` validates it and writes the ignored `src/exercise-catalog.generated.json`. The normal test, typecheck, development, and deployment scripts prepare this build input automatically. `catalog_not_configured` now only occurs when Hevy returns no templates and no catalog is bundled.
 
 ## 2. Prepare runtime secrets
 
@@ -55,7 +55,7 @@ The server uses only the documented public API, which is weaker than Hevy's mobi
 - Workout writes lose per-set completion times, rest timers, volume-doubling flags, and routine linkage. RPE must be one of 6, 7, 7.5, 8, 8.5, 9, 9.5, 10; set types must be `warmup`, `normal`, `failure`, or `dropset`; superset IDs must be integers.
 - Routine writes lose ordering, parent and program links, and the coach RPE flag, and the public target rep ranges are not written.
 - Account info is reduced to ID, username, display name, and unit preferences; body measurements lose their ID and creation timestamp; custom exercises lose their archived flag.
-- Reads are paginated page by page, so full-list reads cost one request per page of ten workouts. Standard exercise search still uses the owner-supplied catalog; the public exercise templates could seed one later.
+- Reads are paginated page by page, so full-list reads cost one request per page of ten workouts. Exercise-template reads page at 100 per request and are cached for five minutes; a full training summary additionally reads all body measurements.
 
 ### Hevy new-workout webhook
 
@@ -101,7 +101,7 @@ export WORKER_URL='https://hevy-mcp.YOUR_SUBDOMAIN.workers.dev'
 curl --fail-with-body --silent --show-error "$WORKER_URL/health"
 ```
 
-Expected response: `{"status":"ok"}`. This endpoint is public and only proves the Worker is serving requests.
+Expected response: `{"status":"ok","name":"hevy-mcp","version":"0.2.0"}` (the version matches `package.json` and the value reported by the `get_server_info` MCP tool). This endpoint is public and only proves the Worker is serving requests; verify authentication and an MCP read before calling a deployment verified.
 
 ## 4. Verify authentication and API access
 
@@ -147,14 +147,12 @@ Create the token in your [Cloudflare API token settings](https://dash.cloudflare
 
 The workflow uses the already configured runtime secrets on Cloudflare. It does not fetch your `.dev.vars`. Verify it targets the same Worker and OAuth namespace before the first CI deployment. With an ID-less binding, inspect resource resolution in the run; do not accept creation of an unintended replacement namespace.
 
-An ignored local catalog is not present in a fresh CI checkout. Unless you arrange an authorized private build input, a CI deployment ships without the standard catalog, even if your previous local deployment included one. Use local deployment when you need your private catalog preserved, or explicitly design and review a private CI catalog source; never commit the Hevy catalog just to make CI work.
-
-The workflow requires explicit acknowledgment that it deploys without standard exercise search.
+An ignored local catalog is not present in a fresh CI checkout. A CI deployment therefore ships without your private catalog overlay; standard exercise search still works through Hevy's exercise templates, but your catalog's extra metadata is absent until you deploy locally or arrange an authorized private build input. Never commit the Hevy catalog just to make CI work.
 
 Once the workflow exists on the remote repository's default branch, trigger it from GitHub Actions, or with an authenticated GitHub CLI:
 
 ```sh
-gh workflow run deploy.yml --repo hmemcpy/hevy-mcp -f deploy_without_standard_catalog=true
+gh workflow run deploy.yml --repo hmemcpy/hevy-mcp
 gh run list --workflow deploy.yml --repo hmemcpy/hevy-mcp --limit 5
 gh run watch RUN_ID --repo hmemcpy/hevy-mcp --exit-status
 ```

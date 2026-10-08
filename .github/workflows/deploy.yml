@@ -1,12 +1,6 @@
 name: Deploy
 on:
   workflow_dispatch:
-    inputs:
-      deploy_without_standard_catalog:
-        description: "Deploy without standard exercise search (replaces any previously bundled catalog)"
-        type: boolean
-        required: true
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -18,11 +12,6 @@ jobs:
     timeout-minutes: 15
     environment: production
     steps:
-      - name: Confirm catalog-free deployment
-        if: ${{ !inputs.deploy_without_standard_catalog }}
-        run: |
-          echo "This workflow has no private catalog. Acknowledge catalog-free deployment or deploy locally."
-          exit 1
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod"
 import type { Env } from "./types"
+import { SERVER_NAME, SERVER_VERSION } from "./version"
 
 const changeValues = z.object({
   weightKg: z.number().nonnegative().nullable().optional(),
@@ -223,6 +224,59 @@ const workoutDeletePreview = z.object({
   setCount: z.number().int().nonnegative(),
 })
 
+const measurementValue = z.number().nullable().optional()
+
+const measurementValues = z.object({
+  weightKg: measurementValue,
+  leanMassKg: measurementValue,
+  fatPercent: measurementValue,
+  neckCm: measurementValue,
+  shoulderCm: measurementValue,
+  chestCm: measurementValue,
+  leftBicepCm: measurementValue,
+  rightBicepCm: measurementValue,
+  leftForearmCm: measurementValue,
+  rightForearmCm: measurementValue,
+  abdomenCm: measurementValue,
+  waistCm: measurementValue,
+  hipsCm: measurementValue,
+  leftThighCm: measurementValue,
+  rightThighCm: measurementValue,
+  leftCalfCm: measurementValue,
+  rightCalfCm: measurementValue,
+})
+
+const measurementSnapshotValue = z.number().nullable()
+
+const measurementSnapshot = z.object({
+  date: z.string().min(1),
+  weightKg: measurementSnapshotValue,
+  leanMassKg: measurementSnapshotValue,
+  fatPercent: measurementSnapshotValue,
+  neckCm: measurementSnapshotValue,
+  shoulderCm: measurementSnapshotValue,
+  chestCm: measurementSnapshotValue,
+  leftBicepCm: measurementSnapshotValue,
+  rightBicepCm: measurementSnapshotValue,
+  leftForearmCm: measurementSnapshotValue,
+  rightForearmCm: measurementSnapshotValue,
+  abdomenCm: measurementSnapshotValue,
+  waistCm: measurementSnapshotValue,
+  hipsCm: measurementSnapshotValue,
+  leftThighCm: measurementSnapshotValue,
+  rightThighCm: measurementSnapshotValue,
+  leftCalfCm: measurementSnapshotValue,
+  rightCalfCm: measurementSnapshotValue,
+})
+
+const bodyMeasurementSavePreview = z.object({
+  date: z.string().min(1),
+  operation: z.enum(["create", "update"]),
+  revision: z.string().min(1),
+  before: measurementSnapshot.nullable(),
+  after: measurementSnapshot,
+})
+
 async function callCoordinator(
   env: Env,
   path: string,
@@ -240,8 +294,8 @@ async function callCoordinator(
 
 export function createWorkoutMcpServer(env: Env): McpServer {
   const server = new McpServer({
-    name: "hevy-mcp",
-    version: "0.1.0",
+    name: SERVER_NAME,
+    version: SERVER_VERSION,
   })
 
   server.registerTool(
@@ -283,7 +337,7 @@ export function createWorkoutMcpServer(env: Env): McpServer {
     {
       title: "Search exercise catalog",
       description:
-        "Search the owner-supplied exercise catalog by title or metadata before adding an exercise to an active workout.",
+        "Search available exercises by title or metadata before adding an exercise to an active workout. Sources are this account's Hevy exercise templates (standard and custom) plus the optional owner-supplied catalog overlay.",
       inputSchema: z.object({
         query: z.string().default(""),
         limit: z.number().int().min(1).max(100).default(25),
@@ -319,6 +373,37 @@ export function createWorkoutMcpServer(env: Env): McpServer {
   )
 
   server.registerTool(
+    "get_server_info",
+    {
+      title: "Get server info",
+      description:
+        "Return the server name, version, and feature list. Use this to confirm which deployment you are talking to.",
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    },
+    async () => ({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            name: SERVER_NAME,
+            version: SERVER_VERSION,
+            purpose: "Interactive workout session management for a single Hevy account",
+            features: [
+              "hosted workout sessions",
+              "preview-and-apply writes with revision checks",
+              "training summary",
+              "standard exercise search",
+              "body-measurement save previews",
+              "workout webhook events",
+            ],
+          }),
+        },
+      ],
+    }),
+  )
+
+  server.registerTool(
     "get_body_measurements",
     {
       title: "Get body measurements",
@@ -327,6 +412,67 @@ export function createWorkoutMcpServer(env: Env): McpServer {
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
     async () => callCoordinator(env, "/v1/body-measurements"),
+  )
+
+  server.registerTool(
+    "get_training_summary",
+    {
+      title: "Get training summary",
+      description:
+        "Return an aggregated view of the last 1-12 weeks (default 4): workout count, sets, volume, per-workout rows, top exercises by volume, and the body-weight trend. Use for progress questions before recommending changes.",
+      inputSchema: z.object({
+        weeks: z
+          .number()
+          .int()
+          .min(1)
+          .max(12)
+          .optional()
+          .describe("Window length in weeks (1-12, default 4)"),
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    },
+    async ({ weeks }) => callCoordinator(env, `/v1/training-summary?weeks=${weeks ?? 4}`),
+  )
+
+  server.registerTool(
+    "preview_body_measurement_save",
+    {
+      title: "Preview body-measurement save",
+      description:
+        "Validate saving a body measurement for one date without writing. Omitted values keep the existing entry's value on update; explicit nulls clear values. Always show the returned before/after preview to the user before applying it.",
+      inputSchema: z.object({
+        date: z.string().min(1).describe("Measurement date formatted YYYY-MM-DD"),
+        values: measurementValues,
+      }),
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    },
+    async ({ date, values }) =>
+      callCoordinator(env, "/v1/body-measurements/save/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ date, values }),
+      }),
+  )
+
+  server.registerTool(
+    "apply_body_measurement_save",
+    {
+      title: "Apply body-measurement save",
+      description:
+        "Write a previously returned, unchanged body-measurement preview. Call only after the user explicitly approves the exact preview in the current conversation.",
+      inputSchema: z.object({
+        preview: bodyMeasurementSavePreview.describe(
+          "The complete unchanged result returned by preview_body_measurement_save",
+        ),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+    },
+    async ({ preview }) =>
+      callCoordinator(env, "/v1/body-measurements/save/apply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(preview),
+      }),
   )
 
   server.registerTool(
@@ -652,6 +798,80 @@ export function createWorkoutMcpServer(env: Env): McpServer {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(preview),
       }),
+  )
+
+  // Prompt arguments arrive as strings on the wire, and clients may omit
+  // arguments entirely; the schemas accept that. The safety rules live in the
+  // prompt text itself, not only in WORKOUT_UX.md.
+  server.registerPrompt(
+    "start_workout_from_routine",
+    {
+      title: "Start a workout session",
+      description: "Run an interactive workout session with the approval-first finish flow.",
+      argsSchema: z.object({ routineId: z.string().min(1) }),
+    },
+    ({ routineId }) => ({
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: [
+              `Run an interactive workout session for routine ${routineId} on this Hevy account.`,
+              "",
+              "During the session:",
+              "1. Call get_routine, then start_workout_session with the routine ID.",
+              "2. Confirm each logged set succinctly: exercise, actual load, reps, RPE when supplied, and one actionable next-set recommendation. Keep machine-specific baselines and setup notes distinct.",
+              "3. Use search_exercises and get_active_workout_session as needed.",
+              "",
+              "Finishing (mandatory order):",
+              "1. Always call preview_finish_workout_session first.",
+              "2. Present the exact preview: duration, exercise count, completed-set count, start/end timing, and a readable table of exercises and sets (weights, reps, RPE, useful setup notes). Make omissions explicit (incomplete sets and untouched exercises are dropped from the preview).",
+              "3. Offer an interactive approval control only if the client supports one that submits a new user turn approving the exact preview; it must never call the write tool directly. Always provide a plain-text approval fallback.",
+              "4. Only after explicit approval of that exact preview in this conversation, call finish_workout_session with the unchanged preview. If the draft changed or the preview is stale, regenerate and request approval again.",
+              "5. After saving, report the actual saved workout (duration, exercise and set totals from the response) and 1-2 evidence-based highlights. Never claim success before the save is confirmed, and surface any mismatch between preview and saved result.",
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
+  )
+
+  server.registerPrompt(
+    "analyze_workout_progress",
+    {
+      title: "Analyze workout progress",
+      description: "Summarize recent training progress and suggest next steps.",
+      argsSchema: z
+        .object({
+          weeks: z
+            .string()
+            .regex(/^(?:[1-9]|1[0-2])$/)
+            .optional(),
+        })
+        .prefault({}),
+    },
+    ({ weeks }) => {
+      const window = Number(weeks ?? "4")
+      return {
+        messages: [
+          {
+            role: "user" as const,
+            content: {
+              type: "text" as const,
+              text: [
+                `Analyze my training progress over the last ${window} week${window === 1 ? "" : "s"} on this Hevy account.`,
+                "",
+                "1. Call get_training_summary for the window, then get_recent_workouts and get_exercise_history for the exercises that matter most.",
+                "2. Present trends in volume, sets, and workout frequency, plus the body-weight trend, with the actual numbers.",
+                "3. Give evidence-based suggestions tied to specific exercises and sets.",
+                "4. If you propose routine target changes, validate them with preview_routine_progression, show the before/after preview, and apply only after I explicitly approve the exact preview in this conversation.",
+              ].join("\n"),
+            },
+          },
+        ],
+      }
+    },
   )
 
   return server

@@ -38,10 +38,15 @@ for (const name of [
     `Missing ${name}`,
   )
 }
+const versionSource = await readFile(new URL("../src/version.ts", import.meta.url), "utf8")
+assert.ok(
+  versionSource.includes(`from "../package.json"`),
+  "src/version.ts must read the version from package.json",
+)
 const mcpSource = await readFile(new URL("../src/mcp.ts", import.meta.url), "utf8")
 assert.ok(
-  mcpSource.includes(`version: "${packageJson.version}"`),
-  "MCP and package versions differ",
+  mcpSource.includes("version: SERVER_VERSION"),
+  "MCP initialization must use the shared server version from src/version.ts",
 )
 let files = []
 try {

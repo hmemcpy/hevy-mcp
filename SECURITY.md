@@ -10,8 +10,9 @@ secret; OAuth state is stored in KV. Do not put either kind of token in Git, an
 issue, a screenshot, command arguments, or a chat message. `.dev.vars` and
 `*.local.json` files are ignored, not encrypted.
 
-Account tools expose personal profile fields and body measurements. Authorizing
-a client shares those with that client. Workout drafts default to public
+Account tools expose personal profile fields and body measurements, and write
+tools can save body measurements for any date. Authorizing a client shares
+those with that client. Workout drafts default to public
 workouts and public biometrics; explicitly set `isPrivate: true` and
 `isBiometricsPublic: false` when needed.
 

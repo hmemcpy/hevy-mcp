@@ -14,7 +14,7 @@ try {
     const previous = JSON.parse(await readFile(output, "utf8"))
     if (Array.isArray(previous) && previous.length > 0) {
       throw new Error(
-        "Catalog input is missing but the previous build contains exercises. Restore exercise-catalog.local.json, or explicitly set it to [] to disable standard search.",
+        "Catalog input is missing but the previous build contains exercises. Restore exercise-catalog.local.json, or explicitly set it to [] to remove the owner overlay.",
       )
     }
   } catch (previousError) {
@@ -50,5 +50,5 @@ const clean = catalog.map((exercise, index) => {
 })
 await writeFile(output, `${JSON.stringify(clean, null, 2)}\n`)
 console.log(
-  `Prepared ${clean.length} exercises${clean.length === 0 ? " (standard search disabled; see docs/catalog.md)" : ""}`,
+  `Prepared ${clean.length} exercises${clean.length === 0 ? " (no owner overlay; standard search falls back to Hevy templates, see docs/catalog.md)" : " (owner overlay; merged with Hevy templates, see docs/catalog.md)"}`,
 )

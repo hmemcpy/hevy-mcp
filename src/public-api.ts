@@ -9,6 +9,7 @@ import {
   CompletedWorkout,
   CompletedWorkoutExercise,
   CustomExercise,
+  ExerciseTemplate,
   RoutineSyncResponse,
   UserAccount,
   WorkoutCountResponse,
@@ -30,6 +31,10 @@ export interface PublicApiConfig {
 
 const EPOCH_ISO = "1970-01-01T00:00:00.000Z"
 const PUBLIC_PAGE_SIZE = 10
+// The exercise-template catalog is an order of magnitude larger than the
+// other listings; use the maximum page size Hevy documents (100) so a full
+// fetch stays within a handful of requests.
+const TEMPLATE_PAGE_SIZE = 100
 const MAX_PUBLIC_PAGES = 100
 const SET_TYPES = ["warmup", "normal", "failure", "dropset"]
 const RPE_VALUES = [6, 7, 7.5, 8, 8.5, 9, 9.5, 10]
@@ -378,6 +383,24 @@ function toCustomExercise(template: PublicExerciseTemplate): CustomExercise {
   })
 }
 
+function toExerciseTemplate(template: PublicExerciseTemplate): ExerciseTemplate {
+  const exerciseType = optionalText(template.type)
+  const equipment = optionalText(template.equipment)
+  const muscleGroup = optionalText(template.primary_muscle_group)
+  const otherMuscles = template.secondary_muscle_groups ?? undefined
+  const isCustom =
+    template.is_custom === null || template.is_custom === undefined ? undefined : template.is_custom
+  return ExerciseTemplate.make({
+    id: template.id,
+    title: template.title ?? "",
+    ...(exerciseType === undefined ? {} : { exercise_type: exerciseType }),
+    ...(equipment === undefined ? {} : { equipment_category: equipment }),
+    ...(muscleGroup === undefined ? {} : { muscle_group: muscleGroup }),
+    ...(otherMuscles === undefined ? {} : { other_muscles: otherMuscles }),
+    ...(isCustom === undefined ? {} : { is_custom: isCustom }),
+  })
+}
+
 function toBodyMeasurement(measurement: PublicBodyMeasurement): BodyMeasurement {
   return BodyMeasurement.make({
     date: measurement.date,
@@ -536,13 +559,14 @@ export function makePublicApi(config: PublicApiConfig, fetchImpl: ApiFetch): Eff
       path: string,
       pageSchema: Schema.Decoder<A>,
       readItems: (page: A) => ReadonlyArray<B>,
+      pageSize: number = PUBLIC_PAGE_SIZE,
     ) {
       const separator = path.includes("?") ? "&" : "?"
       const items: B[] = []
       let pageCount = 1
       for (let page = 1; page <= Math.min(pageCount, MAX_PUBLIC_PAGES); page += 1) {
         const decoded = yield* request(
-          `${path}${separator}page=${page}&pageSize=${PUBLIC_PAGE_SIZE}`,
+          `${path}${separator}page=${page}&pageSize=${pageSize}`,
           {},
           pageSchema,
         )
@@ -590,6 +614,17 @@ export function makePublicApi(config: PublicApiConfig, fetchImpl: ApiFetch): Eff
         const custom = templates.filter(template => template.is_custom === true)
         return yield* Effect.forEach(custom, template =>
           mapResponse(() => toCustomExercise(template)),
+        )
+      }),
+      exerciseTemplates: Effect.fn("PublicApi.exerciseTemplates")(function* () {
+        const templates = yield* paged(
+          "/v1/exercise_templates",
+          PublicExerciseTemplatePageSchema,
+          page => arrayOrEmpty(record(page).exercise_templates) as PublicExerciseTemplate[],
+          TEMPLATE_PAGE_SIZE,
+        )
+        return yield* Effect.forEach(templates, template =>
+          mapResponse(() => toExerciseTemplate(template)),
         )
       }),
       workouts: Effect.fn("PublicApi.workouts")(function* () {
@@ -641,6 +676,35 @@ export function makePublicApi(config: PublicApiConfig, fetchImpl: ApiFetch): Eff
         )
         return yield* Effect.forEach(measurements, measurement =>
           mapResponse(() => toBodyMeasurement(measurement)),
+        )
+      }),
+      bodyMeasurement: Effect.fn("PublicApi.bodyMeasurement")(function* (date: string) {
+        const path = `/v1/body_measurements/${encodeURIComponent(date)}`
+        return yield* request(path, {}, PublicBodyMeasurementSchema).pipe(
+          Effect.map(measurement => toBodyMeasurement(measurement)),
+          Effect.catchIf(
+            (error): error is HevyApiError =>
+              error._tag === "HevyApiError" && error.apiStatus === 404,
+            () => Effect.succeed<BodyMeasurement | null>(null),
+          ),
+        )
+      }),
+      createBodyMeasurement: Effect.fn("PublicApi.createBodyMeasurement")(function* (body) {
+        // Hevy documents a flat request body; a 409 means the date already
+        // exists and the caller must preview an update instead.
+        yield* request(
+          "/v1/body_measurements",
+          { method: "POST", body: JSON.stringify(body) },
+          Schema.Unknown,
+        )
+      }),
+      updateBodyMeasurement: Effect.fn("PublicApi.updateBodyMeasurement")(function* (date, body) {
+        // PUT replaces every field: the body carries the complete field set,
+        // and a 404 means the date vanished between preview and apply.
+        yield* request(
+          `/v1/body_measurements/${encodeURIComponent(date)}`,
+          { method: "PUT", body: JSON.stringify(body) },
+          Schema.Unknown,
         )
       }),
       userAccount: Effect.fn("PublicApi.userAccount")(function* () {

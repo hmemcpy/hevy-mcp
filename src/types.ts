@@ -75,6 +75,19 @@ export class CustomExercise extends Schema.Class<CustomExercise>("CustomExercise
   is_archived: Schema.optionalKey(Schema.Boolean),
 }) {}
 
+// One exercise template from Hevy's listing: standard templates plus this
+// account's custom exercises (is_custom). Metadata fields are optional
+// because Hevy's template listing does not always return them.
+export class ExerciseTemplate extends Schema.Class<ExerciseTemplate>("ExerciseTemplate")({
+  id: Schema.NonEmptyString,
+  title: Schema.String,
+  exercise_type: Schema.optionalKey(Schema.String),
+  equipment_category: Schema.optionalKey(Schema.String),
+  muscle_group: Schema.optionalKey(Schema.String),
+  other_muscles: Schema.optionalKey(Schema.Array(Schema.String)),
+  is_custom: Schema.optionalKey(Schema.Boolean),
+}) {}
+
 export class CompletedWorkoutExercise extends Schema.Class<CompletedWorkoutExercise>(
   "CompletedWorkoutExercise",
 )({
