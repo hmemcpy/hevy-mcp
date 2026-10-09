@@ -41,7 +41,7 @@ For a write, ask for a preview first and inspect the exact target, exercise, set
 
 Only one hosted draft can be active at a time. Use `get_active_workout_session` before starting another. Draft changes stay in the Worker until the finish/apply step saves a completed workout. Discarding the draft and deleting a completed workout are different actions.
 
-If standard exercise search reports `catalog_not_configured`, Hevy returned no templates and no owner catalog is bundled for this deployment. `list_custom_exercises` lists your custom templates directly. The server's `start_workout_from_routine` prompt carries the full session and finish-approval flow; [WORKOUT_UX.md](../WORKOUT_UX.md) documents the contract and its portable tier you can paste into client instructions. `get_server_info` reports the deployed version if you need to confirm which release you are talking to.
+If standard exercise search reports `catalog_not_configured`, Hevy returned no templates and no owner catalog is bundled for this deployment. `list_custom_exercises` lists your custom templates directly. The server's `start_workout_from_routine` prompt carries the full session and finish-approval flow: preview first, explicit approval of the exact preview, then a save confirmed against the actual response. `get_server_info` reports the deployed version if you need to confirm which release you are talking to.
 
 ## OAuth access and revocation
 

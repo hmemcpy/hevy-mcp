@@ -801,8 +801,8 @@ export function createWorkoutMcpServer(env: Env): McpServer {
   )
 
   // Prompt arguments arrive as strings on the wire, and clients may omit
-  // arguments entirely; the schemas accept that. The safety rules live in the
-  // prompt text itself, not only in WORKOUT_UX.md.
+  // arguments entirely; the schemas accept that. The safety rules live in
+  // the prompt text itself so they reach any client that renders prompts.
   server.registerPrompt(
     "start_workout_from_routine",
     {
