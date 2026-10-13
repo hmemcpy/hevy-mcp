@@ -72,6 +72,13 @@ const PublicWorkoutSchema = Schema.Struct({
   exercises: Schema.optionalKey(Schema.Array(PublicWorkoutExerciseSchema)),
 })
 
+const PublicWorkoutWriteResponseSchema = Schema.Union([
+  PublicWorkoutSchema,
+  Schema.Struct({
+    workout: Schema.Array(PublicWorkoutSchema),
+  }),
+])
+
 const PublicRoutineExerciseSchema = Schema.Struct({
   index: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
   title: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -182,6 +189,7 @@ const PublicWorkoutEventPageSchema = Schema.Struct({
 
 type PublicSet = Schema.Schema.Type<typeof PublicSetSchema>
 type PublicWorkout = Schema.Schema.Type<typeof PublicWorkoutSchema>
+type PublicWorkoutWriteResponse = Schema.Schema.Type<typeof PublicWorkoutWriteResponseSchema>
 type PublicRoutine = Schema.Schema.Type<typeof PublicRoutineSchema>
 type PublicExerciseTemplate = Schema.Schema.Type<typeof PublicExerciseTemplateSchema>
 type PublicBodyMeasurement = Schema.Schema.Type<typeof PublicBodyMeasurementSchema>
@@ -193,6 +201,13 @@ function invalidContract(detail: string): ApiError {
     code: "invalid_api_response",
     message: `Public API response did not match its contract (${detail})`,
   })
+}
+
+function unwrapWorkoutWriteResponse(response: PublicWorkoutWriteResponse): PublicWorkout {
+  if ("id" in response) return response
+  const created = response.workout[0]
+  if (created === undefined) throw invalidContract("workout write response contained no workout")
+  return created
 }
 
 function unrepresentable(value: unknown, what: string, allowed: string): ApiError {
@@ -736,11 +751,12 @@ export function makePublicApi(config: PublicApiConfig, fetchImpl: ApiFetch): Eff
       }),
       createWorkout: Effect.fn("PublicApi.createWorkout")(function* (body) {
         const publicBody = yield* translate(() => toPublicWorkoutCreateBody(body))
-        const created = yield* request(
+        const response = yield* request(
           "/v1/workouts",
           { method: "POST", body: JSON.stringify(publicBody) },
-          PublicWorkoutSchema,
+          PublicWorkoutWriteResponseSchema,
         )
+        const created = yield* mapResponse(() => unwrapWorkoutWriteResponse(response))
         return yield* mapResponse(() => toCompletedWorkout(created))
       }),
       deleteWorkout: Effect.fn("PublicApi.deleteWorkout")(function* () {
