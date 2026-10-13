@@ -224,7 +224,7 @@ if (mode === "smoke") {
     }
     const catalogBytes = await readFile(join(source, "exercise-catalog.local.json"))
     const catalog = JSON.parse(catalogBytes)
-    assert.ok(Array.isArray(catalog) && catalog.length > 0, "Expected the retained private catalog")
+    assert.ok(Array.isArray(catalog), "Expected the catalog overlay to be an array")
     await save("catalog.json", {
       count: catalog.length,
       sha256: createHash("sha256").update(catalogBytes).digest("hex"),

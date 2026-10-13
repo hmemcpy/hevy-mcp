@@ -101,6 +101,13 @@ test("preparation preserves existing Worker and OAuth namespace", () =>
     assert.equal(config.kv_namespaces[0].id, "b26ab34edc6242af84b0acfa3fb1fa34")
   }))
 
+test("preparation accepts an empty catalog overlay", () =>
+  fixture((root, source, execute) => {
+    writeFileSync(join(source, "exercise-catalog.local.json"), "[]")
+    execute("prepare")
+    assert.equal(JSON.parse(readFileSync(join(root, "hevy-cutover/catalog.json"), "utf8")).count, 0)
+  }))
+
 test("preparation refuses version drift", () =>
   fixture((_, __, execute) =>
     assert.throws(() => execute("prepare", { EXPECTED_VERSION: afterVersion })),

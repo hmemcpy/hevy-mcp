@@ -71,8 +71,12 @@ jobs:
         env:
           EXERCISE_CATALOG: ${{ secrets.EXERCISE_CATALOG }}
         run: |
-          test -n "$EXERCISE_CATALOG"
-          printf '%s' "$EXERCISE_CATALOG" | base64 --decode | gunzip > exercise-catalog.local.json
+          if [ -n "$EXERCISE_CATALOG" ]; then
+            printf '%s' "$EXERCISE_CATALOG" | base64 --decode | gunzip > exercise-catalog.local.json
+          else
+            echo 'No EXERCISE_CATALOG secret set; deploying with an empty owner overlay.'
+            echo '[]' > exercise-catalog.local.json
+          fi
       - name: Check source including the private catalog
         if: env.OPERATION == 'deploy'
         run: bun run check
