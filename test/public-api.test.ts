@@ -294,7 +294,10 @@ describe("public API writes", () => {
   it("also accepts the bare workout write response documented by Hevy", async () => {
     const { fetcher } = recordingFetcher(url => {
       if (url.endsWith("/v1/workouts")) {
-        return Response.json({ ...baseWorkout, id: "server-2", title: "Friday Leg Day" }, { status: 201 })
+        return Response.json(
+          { ...baseWorkout, id: "server-2", title: "Friday Leg Day" },
+          { status: 201 },
+        )
       }
       return undefined
     })
