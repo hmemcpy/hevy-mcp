@@ -1,0 +1,123 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect production, deploy main, or roll back code
+        type: choice
+        options: [inspect, deploy, rollback]
+        default: inspect
+        required: true
+      expected_version:
+        description: For deploy, current version recorded by a successful inspect run
+        type: string
+        required: false
+      rollback_version:
+        description: For rollback only, exact previous version from the private rollback artifact
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workout-progress-api-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    # Push-triggered deploys run only once credentials are configured; manual runs always proceed.
+    if: github.event_name == 'workflow_dispatch' || secrets.CLOUDFLARE_API_TOKEN != ''
+    env:
+      OPERATION: ${{ inputs.operation || 'deploy' }}
+      DEPLOY_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Test deployment guards without credentials
+        run: node --test test/production-deployment.node.mjs
+      - name: Restore private catalog build input
+        if: env.OPERATION == 'deploy'
+        env:
+          EXERCISE_CATALOG: ${{ secrets.EXERCISE_CATALOG }}
+        run: |
+          test -n "$EXERCISE_CATALOG"
+          printf '%s' "$EXERCISE_CATALOG" | base64 --decode | gunzip > exercise-catalog.local.json
+      - name: Check source including the private catalog
+        if: env.OPERATION == 'deploy'
+        run: bun run check
+      - name: Inspect production and prepare exact resource configuration
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          ROLLBACK_VERSION: ${{ inputs.rollback_version }}
+        run: |
+          case "$OPERATION" in
+            inspect) node scripts/production-deployment.mjs inspect ;;
+            deploy) node scripts/production-deployment.mjs prepare ;;
+            rollback) node scripts/production-deployment.mjs prepare-rollback ;;
+          esac
+      - name: Save rollback record before any deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: hevy-before-${{ github.run_id }}
+          path: ${{ runner.temp }}/hevy-cutover/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Dry-run production resource configuration
+        if: env.OPERATION == 'deploy'
+        run: bunx wrangler deploy --config wrangler.production.local.json --dry-run --keep-vars
+      - name: Deploy main to the existing Worker
+        if: env.OPERATION == 'deploy'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          node scripts/production-deployment.mjs confirm
+          bunx wrangler deploy --config wrangler.production.local.json --keep-vars --message "hevy-mcp $DEPLOY_SOURCE_SHA"
+      - name: Roll back code to the explicitly selected previous version
+        if: env.OPERATION == 'rollback'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ROLLBACK_VERSION: ${{ inputs.rollback_version }}
+        run: >
+          bunx wrangler rollback "$ROLLBACK_VERSION" --config wrangler.production.local.json
+          --name workout-progress-api --yes --message 'Restore pre-cutover version'
+      - name: Verify version and preserved production resources
+        if: env.OPERATION != 'inspect'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ROLLBACK_VERSION: ${{ inputs.rollback_version }}
+        run: |
+          if [ "$OPERATION" = "deploy" ]; then
+            node scripts/production-deployment.mjs verify
+          else
+            node scripts/production-deployment.mjs verify-rollback
+          fi
+      - name: Check health, OAuth discovery, and authentication boundaries
+        if: env.OPERATION != 'inspect'
+        run: node scripts/production-deployment.mjs smoke
+      - name: Save verification record
+        if: env.OPERATION != 'inspect'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hevy-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/hevy-cutover/
+          if-no-files-found: error
+          retention-days: 30
