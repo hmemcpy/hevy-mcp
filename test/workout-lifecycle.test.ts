@@ -261,13 +261,15 @@ describe("active workout lifecycle", () => {
     })
 
     expect(findWorkoutMatchingFinishPreview([saved], preview)?.id).toBe("server-workout-1")
+    const savedSet = saved.exercises[0]?.sets[0]
+    if (savedSet === undefined) throw new Error("Expected saved workout set")
     const changed = CompletedWorkout.make({
       ...saved,
       id: "server-workout-2",
       exercises: [
         {
           exercise_template_id: "BENCH001",
-          sets: [{ ...saved.exercises[0]!.sets[0]!, reps: 5 }],
+          sets: [{ ...savedSet, reps: 5 }],
         },
       ],
     })
