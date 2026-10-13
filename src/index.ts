@@ -57,8 +57,8 @@ import {
 import {
   ActiveWorkoutStore,
   createWorkoutDeletePreview,
-  findWorkoutMatchingFinishPreview,
   DiscardWorkoutSessionRequest,
+  findWorkoutMatchingFinishPreview,
   PreviewWorkoutFinishRequest,
   previewWorkoutFinish,
   StartWorkoutSessionRequest,
