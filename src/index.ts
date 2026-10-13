@@ -58,6 +58,7 @@ import {
   ActiveWorkoutStore,
   createWorkoutDeletePreview,
   DiscardWorkoutSessionRequest,
+  findWorkoutMatchingFinishPreview,
   PreviewWorkoutFinishRequest,
   previewWorkoutFinish,
   StartWorkoutSessionRequest,
@@ -383,6 +384,15 @@ const previewActiveWorkoutFinish = Effect.fn("Workout.previewActiveFinish")(func
   )
 })
 
+function isAmbiguousWorkoutCreateFailure(error: ApiError | HevyApiError): boolean {
+  if (error._tag === "ApiError") return error.code === "invalid_api_response"
+  return (
+    error.apiStatus === 0 ||
+    error.apiStatus >= 500 ||
+    (error.apiStatus >= 200 && error.apiStatus < 300)
+  )
+}
+
 const finishActiveWorkout = Effect.fn("Workout.finishActive")(function* (request: Request) {
   const preview = yield* decodeBody(
     WorkoutFinishPreview,
@@ -399,7 +409,17 @@ const finishActiveWorkout = Effect.fn("Workout.finishActive")(function* (request
   }
   yield* validateWorkoutFinishPreview(active, preview)
   const api = yield* Api
-  const created = yield* api.createWorkout(toCreateWorkoutBody(preview))
+  const created = yield* api.createWorkout(toCreateWorkoutBody(preview)).pipe(
+    Effect.catch(error =>
+      Effect.gen(function* () {
+        if (!isAmbiguousWorkoutCreateFailure(error)) return yield* Effect.fail(error)
+        const workouts = yield* api.workouts().pipe(Effect.catch(() => Effect.succeed([])))
+        const recovered = findWorkoutMatchingFinishPreview(workouts, preview)
+        if (recovered === undefined) return yield* Effect.fail(error)
+        return recovered
+      }),
+    ),
+  )
   yield* (yield* ActiveWorkoutStore).clear()
   return json(
     {

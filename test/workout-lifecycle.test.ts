@@ -11,6 +11,7 @@ import {
   DraftSetValues,
   EditExerciseOperation,
   EditSetOperation,
+  findWorkoutMatchingFinishPreview,
   previewWorkoutFinish,
   StartSetOperation,
   StartWorkoutSessionRequest,
@@ -204,6 +205,75 @@ describe("active workout lifecycle", () => {
       },
       share_to_strava: false,
     })
+  })
+
+  it("finds an already-saved workout matching a finish preview", async () => {
+    const started = await Effect.runPromise(
+      startWorkoutSession(
+        StartWorkoutSessionRequest.make({ routineId: "routine-1" }),
+        routine(),
+        "2026-08-23T10:00:00.900Z",
+        ids("exercise-1", "session-1", "workout-1", "revision-1"),
+      ),
+    )
+    const completed = await Effect.runPromise(
+      updateWorkoutSession(
+        started,
+        UpdateWorkoutSessionRequest.make({
+          revision: "revision-1",
+          operations: [
+            CompleteSetOperation.make({
+              exerciseId: "exercise-1",
+              setIndex: 0,
+              values: DraftSetValues.make({ weightKg: 92.5, reps: 4 }),
+            }),
+          ],
+        }),
+        "2026-08-23T10:06:30.400Z",
+        ids("revision-2"),
+      ),
+    )
+    const preview = await Effect.runPromise(
+      previewWorkoutFinish(completed, "2026-08-23T11:00:00.900Z"),
+    )
+    const saved = CompletedWorkout.make({
+      id: "server-workout-1",
+      name: "Push",
+      start_time: "2026-08-23T10:00:00+00:00",
+      end_time: "2026-08-23T11:00:00+00:00",
+      exercises: [
+        {
+          exercise_template_id: "BENCH001",
+          sets: [
+            {
+              index: 0,
+              indicator: "normal",
+              weight_kg: 92.5,
+              reps: 4,
+              rpe: null,
+              distance_meters: null,
+              duration_seconds: null,
+              custom_metric: null,
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(findWorkoutMatchingFinishPreview([saved], preview)?.id).toBe("server-workout-1")
+    const savedSet = saved.exercises[0]?.sets[0]
+    if (savedSet === undefined) throw new Error("Expected saved workout set")
+    const changed = CompletedWorkout.make({
+      ...saved,
+      id: "server-workout-2",
+      exercises: [
+        {
+          exercise_template_id: "BENCH001",
+          sets: [{ ...savedSet, reps: 5 }],
+        },
+      ],
+    })
+    expect(findWorkoutMatchingFinishPreview([changed], preview)).toBeUndefined()
   })
 
   it("adds, edits, and deletes exercises and sets while preserving set indexes", async () => {

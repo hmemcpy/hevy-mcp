@@ -258,7 +258,10 @@ describe("public API writes", () => {
   it("translates the create body and drops unrepresentable fields", async () => {
     const { calls, fetcher } = recordingFetcher(url => {
       if (url.endsWith("/v1/workouts")) {
-        return Response.json({ ...baseWorkout, id: "server-1", title: "Friday Leg Day" })
+        return Response.json(
+          { workout: [{ ...baseWorkout, id: "server-1", title: "Friday Leg Day" }] },
+          { status: 201 },
+        )
       }
       return undefined
     })
@@ -286,6 +289,35 @@ describe("public API writes", () => {
     expect(set[0]?.completed_at).toBeUndefined()
     expect(set[0]?.index).toBeUndefined()
     expect(created.id).toBe("server-1")
+  })
+
+  it("also accepts the bare workout write response documented by Hevy", async () => {
+    const { fetcher } = recordingFetcher(url => {
+      if (url.endsWith("/v1/workouts")) {
+        return Response.json(
+          { ...baseWorkout, id: "server-2", title: "Friday Leg Day" },
+          { status: 201 },
+        )
+      }
+      return undefined
+    })
+    const created = await Effect.runPromise(
+      Effect.flatMap(makePublicApi(config, fetcher), api => api.createWorkout(createBody)),
+    )
+
+    expect(created.id).toBe("server-2")
+  })
+
+  it("rejects an empty wrapped workout write response", async () => {
+    const { fetcher } = recordingFetcher(url => {
+      if (url.endsWith("/v1/workouts")) return Response.json({ workout: [] }, { status: 201 })
+      return undefined
+    })
+    const error = await failureOf(
+      Effect.flatMap(makePublicApi(config, fetcher), api => api.createWorkout(createBody)),
+    )
+
+    expect(error.code).toBe("invalid_api_response")
   })
 
   it("rejects set values the public API cannot represent", async () => {

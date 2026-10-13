@@ -662,6 +662,55 @@ export function toCreateWorkoutBody(preview: WorkoutFinishPreview): object {
   }
 }
 
+function timestampSecond(value: string | number | null | undefined): number | undefined {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return undefined
+    return Math.floor((value > 1_000_000_000_000 ? value : value * 1_000) / 1_000)
+  }
+  if (typeof value !== "string") return undefined
+  const milliseconds = Date.parse(value)
+  return Number.isFinite(milliseconds) ? Math.floor(milliseconds / 1_000) : undefined
+}
+
+function sameFinishedSet(
+  actual: CompletedWorkout["exercises"][number]["sets"][number],
+  expected: FinishedWorkoutSet,
+): boolean {
+  return (
+    actual.indicator === expected.indicator &&
+    actual.weight_kg === expected.weightKg &&
+    actual.reps === expected.reps &&
+    actual.rpe === expected.rpe &&
+    actual.distance_meters === expected.distanceMeters &&
+    actual.duration_seconds === expected.durationSeconds &&
+    actual.custom_metric === expected.customMetric
+  )
+}
+
+export function findWorkoutMatchingFinishPreview(
+  workouts: ReadonlyArray<CompletedWorkout>,
+  preview: WorkoutFinishPreview,
+): CompletedWorkout | undefined {
+  const expectedStart = timestampSecond(preview.startTime)
+  const expectedEnd = timestampSecond(preview.endTime)
+  return workouts.find(workout => {
+    if (workout.name !== preview.title) return false
+    if (timestampSecond(workout.start_time) !== expectedStart) return false
+    if (timestampSecond(workout.end_time) !== expectedEnd) return false
+    if (workout.exercises.length !== preview.exercises.length) return false
+    return workout.exercises.every((exercise, exerciseIndex) => {
+      const expectedExercise = preview.exercises[exerciseIndex]
+      if (expectedExercise === undefined) return false
+      if (exercise.exercise_template_id !== expectedExercise.exerciseTemplateId) return false
+      if (exercise.sets.length !== expectedExercise.sets.length) return false
+      return exercise.sets.every((set, setIndex) => {
+        const expectedSet = expectedExercise.sets[setIndex]
+        return expectedSet !== undefined && sameFinishedSet(set, expectedSet)
+      })
+    })
+  })
+}
+
 export const validateWorkoutFinishPreview = Effect.fn("WorkoutLifecycle.validateFinishPreview")(
   function* (session: ActiveWorkoutSession, preview: WorkoutFinishPreview) {
     const expected = yield* previewWorkoutFinish(session, preview.endTime)
