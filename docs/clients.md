@@ -62,10 +62,10 @@ If you've already registered `hevy-self-hosted`, update or remove that marketpla
 through your client before adding another copy.
 
 Complete OAuth when prompted. Check that the authorization page belongs to your
-Worker, then enter the automation token there. Never put Hevy credentials or
-bearer tokens in `.mcp.json`, the marketplace, or a conversation. The server
-supports dynamic client registration, so the package does not embed a client
-secret.
+Worker, then approve with the device passkey or enter the automation token
+there. Never put Hevy credentials or bearer tokens in `.mcp.json`, the
+marketplace, or a conversation. The server supports dynamic client registration,
+so the package does not embed a client secret.
 
 Start a new conversation after installation and try “List my routines without
 changing anything.” Compare a result with Hevy before using write tools. Package

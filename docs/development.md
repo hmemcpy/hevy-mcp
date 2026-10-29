@@ -67,7 +67,8 @@ build input is prepared by `scripts/prepare-catalog.mjs`; see
 ## Limits
 
 - A Durable Object stores the active workout draft, webhook events, and OAuth
-  connection approvals. OAuth grants are stored separately in Workers KV.
+  connection approvals. OAuth grants and the owner's enrolled passkeys are
+  stored separately in Workers KV.
 - Rotating the automation token does not revoke existing OAuth grants.
 - `finish_workout_session` saves one completed workout. Check the result
   before retrying a failed write.
