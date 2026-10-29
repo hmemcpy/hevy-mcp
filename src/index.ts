@@ -779,6 +779,19 @@ const mcpHandler = {
   },
 } satisfies ExportedHandler<Env>
 
+// Present-but-undefined TTLs are the provider's documented "never expire"
+// contract: absent properties would fall back to the 30-day refresh-token and
+// 90-day dynamic-client defaults, which is what forced ChatGPT
+// reauthorization. Declared separately because exactOptionalPropertyTypes
+// rejects an explicit undefined for the library's optional number properties.
+const neverExpiring: {
+  refreshTokenTTL?: number | undefined
+  clientRegistrationTTL?: number | undefined
+} = {
+  refreshTokenTTL: undefined,
+  clientRegistrationTTL: undefined,
+}
+
 export default new OAuthProvider<Env>({
   apiRoute: "/mcp",
   apiHandler: mcpHandler,
@@ -787,6 +800,7 @@ export default new OAuthProvider<Env>({
   tokenEndpoint: "/oauth/token",
   clientRegistrationEndpoint: "/oauth/register",
   clientIdMetadataDocumentEnabled: true,
+  ...(neverExpiring as { refreshTokenTTL?: number; clientRegistrationTTL?: number }),
 })
 
 function authorized(request: Request, expected: string): Promise<boolean> {
