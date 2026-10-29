@@ -169,8 +169,10 @@ if (mode === "smoke") {
   await smoke()
 } else if (mode === "confirm") {
   const current = await snapshot()
+  // Push-triggered runs pass EXPECTED_VERSION as an empty string; treat that as
+  // unset so confirmation pins the snapshot this run's prepare step recorded.
   const pinned =
-    process.env.EXPECTED_VERSION ??
+    process.env.EXPECTED_VERSION ||
     JSON.parse(await readFile(join(directory, "before.json"), "utf8")).versionId
   assert.equal(
     current.versionId,

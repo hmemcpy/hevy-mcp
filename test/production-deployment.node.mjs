@@ -147,6 +147,12 @@ test("last-minute version check rejects concurrent deployment", () =>
     assert.throws(() => execute("confirm", { TEST_AFTER: "1", EXPECTED_VERSION: beforeVersion }))
   }))
 
+test("push-style confirmation without an expected version pins the preflight snapshot", () =>
+  fixture((_, __, execute) => {
+    execute("prepare", { EXPECTED_VERSION: "" })
+    execute("confirm", { EXPECTED_VERSION: "" })
+  }))
+
 test("rollback verification checks exact selected version and state identity", () =>
   fixture((root, _, execute) => {
     execute("prepare-rollback", { ROLLBACK_VERSION: afterVersion })
